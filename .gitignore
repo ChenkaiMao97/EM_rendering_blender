@@ -1,5 +1,6 @@
 *.npy
 data/
 *.blend
+*.blend1
 *cache*
 *.DS_Store
