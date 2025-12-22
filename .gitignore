@@ -1,0 +1,4 @@
+*.npy
+data/
+*.blend
+*.DS_Store
