@@ -4,36 +4,38 @@ import numpy as np
 import math
 from mathutils import Vector
 
-from utils.util import clear_scene, ensure_cycles, make_camera_light_autoframe, load_eps, assign_material
+from utils.util import clear_scene, ensure_cycles, make_camera_light_autoframe, load_eps, load_source, assign_material
 from utils.geometry import prepare_mesh_from_voxel, assign_eps_face_attribute_from_volume
 from utils.material import make_material
 
-NPY_PATH = "data/random2/eps.npy"   # <-- change
-NPY_PATH = "data/eps_size_sweep/benchmark_aperiodic_broadband_eps32-01_03_26T16_47_06_eps.npy"   # <-- change
-RENDER_PATH = "results/voxel_render_eps32.png"
+NPY_PATH = "data/ring_resonator/eps.npy"   # <-- change
+NPY_PATH_SRC = "data/ring_resonator/src.npy"   # <-- change
 AXIS_ORDER = "XYZ"  # meaning eps[z,y,x]. Use "XYZ" if eps[x,y,z].
 EPS_THRESH = 1.05   # eps <= thresh -> air (empty)
+SRC_THRESH = 0.0
 VOXEL_SIZE = 0.02   # meters-ish; adjust scale
 CENTER = True
 
 # Appearance
 MAKE_GLASSY = True
 MATERIAL_TRANSMISSION_WEIGHT = 1.0 if MAKE_GLASSY else 0.0
-MATERIAL_ROUGHNESS = 0.5
-MATERIAL_METALLIC = 1.0
+MATERIAL_ROUGHNESS = 0.8
+MATERIAL_METALLIC = 0.8
 MATERIAL_IOR = 1.45
 ALPHA = 1.0
+ALPHA_SRC = 0.8
 
 # Optional smoothing
 ADD_REMESH = True
-REMESH_VOXEL_SIZE = 0.01
-ADD_SMOOTH = False
+REMESH_VOXEL_SIZE = 0.03
+ADD_SMOOTH = True
 SMOOTH_ITERS = 3
 
 # Render settings
 USE_CYCLES = True
 SAMPLES = 128
-BLEND_PATH = "blender_files/epsilon_scene.blend"
+RENDER_PATH = "results/voxel_render.png"
+BLEND_PATH = "blender_files/epsilon_and_source_scene.blend"
 
 def main():
     clear_scene()
@@ -41,18 +43,22 @@ def main():
 
     eps_xyz, occ, eps_min, eps_max = load_eps(NPY_PATH, AXIS_ORDER, EPS_THRESH)
     obj = prepare_mesh_from_voxel(occ, eps_xyz, VOXEL_SIZE, CENTER, ADD_REMESH, REMESH_VOXEL_SIZE, SMOOTH_ITERS, ADD_SMOOTH)
-    bbox = [Vector(i) for i in obj.bound_box]
-    print("bbox:", bbox)
 
     # after remesh and smoothing, assign the mesh attribute based on original eps values
-    # assign_eps_face_attribute_from_volume(obj, eps_xyz=eps_xyz, voxel_size=VOXEL_SIZE, centered=CENTER, attr_name="eps", sample="local_max", radius=2)
-    assign_eps_face_attribute_from_volume(obj, eps_xyz=eps_xyz, voxel_size=VOXEL_SIZE, centered=CENTER, attr_name="eps", sample="nearest")
+    assign_eps_face_attribute_from_volume(obj, eps_xyz=eps_xyz, voxel_size=VOXEL_SIZE, centered=CENTER, attr_name="eps", sample="local_max")
 
     # assign material
-    color1 = (0.7,0.7,0.7,1.0)
-    color2 = (0.0,0.0,0.0,1.0)
-    mat = make_material(MATERIAL_ROUGHNESS, MATERIAL_METALLIC, MATERIAL_IOR, MATERIAL_TRANSMISSION_WEIGHT, attr_name="eps", eps_min=eps_min, eps_max=eps_max, ALPHA=ALPHA, color1=color1, color2=color2)
+    mat = make_material(MATERIAL_ROUGHNESS, MATERIAL_METALLIC, MATERIAL_IOR, MATERIAL_TRANSMISSION_WEIGHT, attr_name="eps", eps_min=eps_min, eps_max=eps_max, ALPHA=ALPHA)
     assign_material(obj, mat)
+
+    # add source
+    src_xyz, occ, src_min, src_max = load_source(NPY_PATH_SRC, AXIS_ORDER, SRC_THRESH)
+    obj_src = prepare_mesh_from_voxel(occ, src_xyz, VOXEL_SIZE, CENTER, ADD_REMESH, REMESH_VOXEL_SIZE, SMOOTH_ITERS, ADD_SMOOTH)
+    # assign material
+    color1 = (1,0,0,1)
+    color2 = (1,0,0,1)
+    mat_src = make_material(MATERIAL_ROUGHNESS, MATERIAL_METALLIC, MATERIAL_IOR, MATERIAL_TRANSMISSION_WEIGHT, attr_name="src", eps_min=src_min, eps_max=src_max, ALPHA=ALPHA_SRC, color1=color1, color2=color2)
+    assign_material(obj_src, mat_src)
     
     make_camera_light_autoframe(obj)
 

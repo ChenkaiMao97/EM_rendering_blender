@@ -142,6 +142,45 @@ def build_mesh_from_quads_with_eps(
     mesh.update()
     return obj
 
+def prepare_mesh_from_voxel(occ, eps_xyz, VOXEL_SIZE, CENTER, ADD_REMESH, REMESH_VOXEL_SIZE, SMOOTH_ITERS, ADD_SMOOTH):
+    print("started naive mesh")
+    quads = naive_voxel_surface_quads(occ, eps_xyz)
+    print("finished meshing")
+    obj = build_mesh_from_quads_with_eps(quads, name="Dielectric")
+    print("finished building mesh")
+
+    obj.scale = (VOXEL_SIZE, VOXEL_SIZE, VOXEL_SIZE)
+    if CENTER:
+        nx, ny, nz = occ.shape
+        obj.location = (-0.5 * nx * VOXEL_SIZE, -0.5 * ny * VOXEL_SIZE, -0.5 * nz * VOXEL_SIZE)
+
+    if ADD_REMESH:
+        orig_scale = obj.scale.copy()
+
+        # Make object active/selected for ops
+        bpy.context.view_layer.objects.active = obj
+        obj.select_set(True)
+
+        obj.scale.z *= 100
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+        # (C) Remesh in squashed space
+        rem = obj.modifiers.new("Remesh", type='REMESH')
+        rem.mode = 'VOXEL'
+        rem.voxel_size = REMESH_VOXEL_SIZE
+        rem.use_smooth_shade = True
+        bpy.ops.object.modifier_apply(modifier=rem.name)
+
+        # (D) Unsquash X and bake back
+        obj.scale.z *= 0.01
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+    if ADD_SMOOTH:
+        print("adding smooth")
+        sm = obj.modifiers.new("Smooth", type='SMOOTH')
+        sm.iterations = SMOOTH_ITERS
+
+    return obj
 
 def assign_eps_face_attribute_from_volume(
     obj,
@@ -150,6 +189,7 @@ def assign_eps_face_attribute_from_volume(
     centered=True,
     attr_name="eps",
     sample="nearest",        # "nearest" or "trilinear" or "local_max"
+    radius=5
 ):
     me = obj.data
     nx, ny, nz = eps_xyz.shape
@@ -175,7 +215,7 @@ def assign_eps_face_attribute_from_volume(
         zi = int(clamp(math.floor(zf), 0, nz - 1))
         return float(eps_xyz[xi, yi, zi])
     
-    def sample_local_max(xf, yf, zf, radius = 5):
+    def sample_local_max(xf, yf, zf, radius = radius):
         x_s = int(clamp(math.floor(xf-radius), 0, nx - 1))
         x_e = int(clamp(math.floor(xf+radius), 0, nx - 1))
 

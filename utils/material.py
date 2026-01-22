@@ -6,7 +6,7 @@ from mathutils import Vector
 import matplotlib.pyplot as plt
 
 from utils.util import set_node_input
-from utils.image import set_colorramp_seismic
+from utils.color import set_colorramp_seismic
 
 def make_material(
     MATERIAL_ROUGHNESS,
@@ -18,7 +18,9 @@ def make_material(
     eps_min=1.0, 
     eps_max=8.0,
     MAKE_GLASSY=True,
-    ALPHA=0.75
+    ALPHA=0.8,
+    color1=(0.5, 0.5, 0.5, 1.0),
+    color2=(0.0, 0.0, 0.0, 1.0)
 ):
     mat = bpy.data.materials.new(name=name)
     mat.use_nodes = True
@@ -54,9 +56,9 @@ def make_material(
 
     cr = ramp.color_ramp
     cr.elements[0].position = 0.0
-    cr.elements[0].color = (0.5, 0.5, 0.5, 1.0)   # black, RGBA
+    cr.elements[0].color = color1
     cr.elements[1].position = 1.0
-    cr.elements[1].color = (0.0, 0.0, 0.0, 1.0)   # white, RGBA
+    cr.elements[1].color = color2
 
     nt.links.new(attr.outputs["Fac"], mapr.inputs["Value"])
     nt.links.new(mapr.outputs["Result"], ramp.inputs["Fac"])
@@ -103,8 +105,17 @@ def make_emissive_image_material(name, image, emission_strength=1.0):
     nt.links.new(tex.outputs["Color"], emission.inputs["Color"])
     emission.inputs["Strength"].default_value = float(emission_strength)
 
-    transparent = nt.nodes.new("ShaderNodeBsdfTransparent")
-    transparent.location = (350, -120)
+    # transparent = nt.nodes.new("ShaderNodeBsdfTransparent")
+    # transparent.inputs["Color"].default_value = (0.8, 0.8, 0.8, 1.0)
+    # transparent.location = (350, -120)
+
+    bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
+    set_node_input(bsdf, ["Roughness"], 1.0)
+    set_node_input(bsdf, ["Metallic"], 0.2)
+    set_node_input(bsdf, ["IOR"], 1.5)
+    set_node_input(bsdf, ["Alpha"], 0.0)
+    set_node_input(bsdf, ["Transmission Weight", "Transmission"], 1.0)
+
 
     mix = nt.nodes.new("ShaderNodeMixShader")
     mix.location = (650, 0)
@@ -112,7 +123,7 @@ def make_emissive_image_material(name, image, emission_strength=1.0):
     # Fac = alpha: 0 -> transparent, 1 -> emission
     # (MixShader: Fac=0 gives input[1], Fac=1 gives input[2])
     nt.links.new(tex.outputs["Alpha"], mix.inputs["Fac"])
-    nt.links.new(transparent.outputs["BSDF"], mix.inputs[1])
+    nt.links.new(bsdf.outputs["BSDF"], mix.inputs[1])
     nt.links.new(emission.outputs["Emission"], mix.inputs[2])
 
     nt.links.new(mix.outputs[0], out.inputs["Surface"])

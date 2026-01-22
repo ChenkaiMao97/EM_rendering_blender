@@ -7,14 +7,18 @@ from mathutils import Vector
 from utils.util import clear_scene, ensure_cycles, make_camera_light_autoframe, load_eps, assign_material
 from utils.geometry import prepare_mesh_from_voxel, assign_eps_face_attribute_from_volume
 from utils.material import make_material
+from utils.image import prepare_slices
 
-NPY_PATH = "data/random2/eps.npy"   # <-- change
-NPY_PATH = "data/eps_size_sweep/benchmark_aperiodic_broadband_eps32-01_03_26T16_47_06_eps.npy"   # <-- change
-RENDER_PATH = "results/voxel_render_eps32.png"
+NPY_PATH = "data/random1/eps.npy"   # <-- change
 AXIS_ORDER = "XYZ"  # meaning eps[z,y,x]. Use "XYZ" if eps[x,y,z].
 EPS_THRESH = 1.05   # eps <= thresh -> air (empty)
 VOXEL_SIZE = 0.02   # meters-ish; adjust scale
 CENTER = True
+
+# If True, use percentiles to avoid extreme outliers dominating the range
+USE_PERCENTILE_RANGE = True
+PCT_LOW = 1
+PCT_HIGH = 99
 
 # Appearance
 MAKE_GLASSY = True
@@ -26,35 +30,50 @@ ALPHA = 1.0
 
 # Optional smoothing
 ADD_REMESH = True
-REMESH_VOXEL_SIZE = 0.01
+REMESH_VOXEL_SIZE = 0.03
 ADD_SMOOTH = False
 SMOOTH_ITERS = 3
+
+GAMMA_TRANSPARENCY = 1.0
+GAMMA_COLOR = 4.0
+ALPHA_MIN = 0.0
+ALPHA_MAX = 1.0
+EMISSION_STRENGTH = 1.5
+CMAP = 'binary'
 
 # Render settings
 USE_CYCLES = True
 SAMPLES = 128
+RENDER_PATH = "results/voxel_render.png"
 BLEND_PATH = "blender_files/epsilon_scene.blend"
+
+slice_centers = [(0,0,0), (0,0,0), (0,0,0)]
+slice_angles = [(0,0,0), (90,0,0), (0,90,0)]
 
 def main():
     clear_scene()
     ensure_cycles(USE_CYCLES, SAMPLES)
 
     eps_xyz, occ, eps_min, eps_max = load_eps(NPY_PATH, AXIS_ORDER, EPS_THRESH)
-    obj = prepare_mesh_from_voxel(occ, eps_xyz, VOXEL_SIZE, CENTER, ADD_REMESH, REMESH_VOXEL_SIZE, SMOOTH_ITERS, ADD_SMOOTH)
-    bbox = [Vector(i) for i in obj.bound_box]
-    print("bbox:", bbox)
-
-    # after remesh and smoothing, assign the mesh attribute based on original eps values
-    # assign_eps_face_attribute_from_volume(obj, eps_xyz=eps_xyz, voxel_size=VOXEL_SIZE, centered=CENTER, attr_name="eps", sample="local_max", radius=2)
-    assign_eps_face_attribute_from_volume(obj, eps_xyz=eps_xyz, voxel_size=VOXEL_SIZE, centered=CENTER, attr_name="eps", sample="nearest")
-
-    # assign material
-    color1 = (0.7,0.7,0.7,1.0)
-    color2 = (0.0,0.0,0.0,1.0)
-    mat = make_material(MATERIAL_ROUGHNESS, MATERIAL_METALLIC, MATERIAL_IOR, MATERIAL_TRANSMISSION_WEIGHT, attr_name="eps", eps_min=eps_min, eps_max=eps_max, ALPHA=ALPHA, color1=color1, color2=color2)
-    assign_material(obj, mat)
+    nx, ny, nz = eps_xyz.shape
     
-    make_camera_light_autoframe(obj)
+    prepare_slices(slice_centers, slice_angles, eps_xyz, USE_PERCENTILE_RANGE, PCT_LOW, PCT_HIGH, 'abs', GAMMA_TRANSPARENCY, GAMMA_COLOR, ALPHA_MIN, ALPHA_MAX, CENTER, VOXEL_SIZE, EMISSION_STRENGTH, CMAP=CMAP)
+
+    # # Create a hidden "bounds" cube to frame the whole volume
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0,0,0))
+    bounds = bpy.context.object
+    bounds.name = "BoundsVolume"
+    bounds.scale = (nx * VOXEL_SIZE, ny * VOXEL_SIZE, nz * VOXEL_SIZE)
+
+    dx,dy,dz = nx*VOXEL_SIZE, ny*VOXEL_SIZE, nz*VOXEL_SIZE
+    print("expected r:", 0.5 * (dx*dx + dy*dy + dz*dz)**0.5)
+
+    bpy.context.view_layer.update()
+
+    make_camera_light_autoframe(bounds)
+
+    bounds.hide_render = True
+    bounds.hide_viewport = True
 
     scene = bpy.context.scene
     scene.render.film_transparent = True

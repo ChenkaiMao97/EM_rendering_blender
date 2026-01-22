@@ -12,8 +12,10 @@ from utils.image import set_colorramp_seismic
 # ----------------------------
 # USER SETTINGS
 # ----------------------------
-NPY_PATH_EPS = "data/wgb_eps.npy"   # <-- change
-NPY_PATH_FIELD = "data/wgb_ez.npy"
+# NPY_PATH_EPS = "data/wgb_eps.npy"   # <-- change
+# NPY_PATH_FIELD = "data/wgb_ez.npy"
+NPY_PATH_EPS = "data/superpixel_eps.npy"
+NPY_PATH_FIELD = "data/superpixel_ez.npy"
 AXIS_ORDER = "XYZ"  # meaning eps[z,y,x]. Use "XYZ" if eps[x,y,z].
 EPS_AIR = 1.0
 EPS_THRESH = 1.05   # eps <= thresh -> air (empty)
@@ -47,7 +49,7 @@ PCT_LOW = 1.0
 PCT_HIGH = 99.0
 
 FIELD_COMPONENT = "real"
-N_ISO = 15
+N_ISO = 21
 
 def main():
     clear_scene()
